@@ -1,7 +1,8 @@
-package server
+package trace
 
 import (
 	"context"
+	"go.opentelemetry.io/otel"
 
 	"github.com/smallnest/rpcx/share"
 	"go.opentelemetry.io/otel/propagation"
@@ -36,6 +37,11 @@ func (s *metadataSupplier) Keys() []string {
 	return out
 }
 
+func IsTrace(ctx context.Context) bool {
+	ok := ctx.Value(OpenTelemetryKey)
+	return ok != nil
+}
+
 func Inject(ctx context.Context, propagators propagation.TextMapPropagator) {
 	meta := ctx.Value(share.ReqMetaDataKey)
 	if meta == nil {
@@ -59,9 +65,17 @@ func Extract(ctx context.Context, propagators propagation.TextMapPropagator) tra
 		}
 	}
 
+	if propagators == nil {
+		propagators = otel.GetTextMapPropagator()
+	}
+
 	ctx = propagators.Extract(ctx, &metadataSupplier{
 		metadata: meta.(map[string]string),
 	})
 
 	return trace.SpanContextFromContext(ctx)
+}
+
+func ContextWithSpanContext(parent context.Context, sc trace.SpanContext) context.Context {
+	return trace.ContextWithSpanContext(parent, sc)
 }

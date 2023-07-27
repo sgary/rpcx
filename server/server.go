@@ -6,8 +6,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/trace"
+	"github.com/smallnest/rpcx/trace"
 	"io"
 	"net"
 	"net/http"
@@ -718,13 +717,16 @@ func (s *Server) handleRequest(ctx context.Context, req *protocol.Message) (res 
 		return s.handleError(res, err)
 	}
 
-	spanCtx := Extract(ctx, otel.GetTextMapPropagator())
-	ctx0 := trace.ContextWithSpanContext(ctx, spanCtx)
+	//判断是否启动链路追踪，如果启动将Context转化成标准的Context
+	if trace.IsTrace(ctx) {
+		spanCtx := trace.Extract(ctx, nil)
+		ctx = trace.ContextWithSpanContext(ctx, spanCtx)
+	}
 
 	if mtype.ArgType.Kind() != reflect.Ptr {
-		err = service.call(ctx0, mtype, reflect.ValueOf(argv).Elem(), reflect.ValueOf(replyv))
+		err = service.call(ctx, mtype, reflect.ValueOf(argv).Elem(), reflect.ValueOf(replyv))
 	} else {
-		err = service.call(ctx0, mtype, reflect.ValueOf(argv), reflect.ValueOf(replyv))
+		err = service.call(ctx, mtype, reflect.ValueOf(argv), reflect.ValueOf(replyv))
 	}
 
 	if err == nil {
@@ -800,6 +802,12 @@ func (s *Server) handleRequestForFunction(ctx context.Context, req *protocol.Mes
 	}
 
 	replyv := reflectTypePools.Get(mtype.ReplyType)
+
+	//判断是否启动链路追踪，如果启动将Context转化成标准的Context
+	if trace.IsTrace(ctx) {
+		spanCtx := trace.Extract(ctx, nil)
+		ctx = trace.ContextWithSpanContext(ctx, spanCtx)
+	}
 
 	if mtype.ArgType.Kind() != reflect.Ptr {
 		err = service.callForFunction(ctx, mtype, reflect.ValueOf(argv).Elem(), reflect.ValueOf(replyv))
