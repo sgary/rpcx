@@ -6,6 +6,8 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 	"io"
 	"net"
 	"net/http"
@@ -716,10 +718,13 @@ func (s *Server) handleRequest(ctx context.Context, req *protocol.Message) (res 
 		return s.handleError(res, err)
 	}
 
+	spanCtx := Extract(ctx, otel.GetTextMapPropagator())
+	ctx0 := trace.ContextWithSpanContext(ctx, spanCtx)
+
 	if mtype.ArgType.Kind() != reflect.Ptr {
-		err = service.call(ctx, mtype, reflect.ValueOf(argv).Elem(), reflect.ValueOf(replyv))
+		err = service.call(ctx0, mtype, reflect.ValueOf(argv).Elem(), reflect.ValueOf(replyv))
 	} else {
-		err = service.call(ctx, mtype, reflect.ValueOf(argv), reflect.ValueOf(replyv))
+		err = service.call(ctx0, mtype, reflect.ValueOf(argv), reflect.ValueOf(replyv))
 	}
 
 	if err == nil {
